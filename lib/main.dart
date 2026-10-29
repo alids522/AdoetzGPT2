@@ -36,7 +36,7 @@ class AdoetzGptApp extends StatelessWidget {
     final visualTheme = appVisualThemeFromKey(app.visualTheme);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'AdoetzGPT',
+      title: 'AdoetzGPT2',
       theme: buildTheme(false, visualTheme: visualTheme),
       darkTheme: buildTheme(true, visualTheme: visualTheme),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,

@@ -64,12 +64,14 @@ dependencies:
   dart_jsonwebtoken: ^3.4.1
   markdown: ^7.3.1
   flutter_markdown_latex: ^0.3.4
-  camera: any
+  # MUSE: pinned from pubspec.lock (was `any`, could drift on next resolve).
+  camera: 0.12.0+1
   camera_web: ^0.3.4
   audioplayers: ^6.1.0
   webview_flutter: ^4.8.0
   webview_flutter_web: ^0.2.3
-  syncfusion_flutter_pdf: any
+  # MUSE: pinned from pubspec.lock (was `any`, could drift on next resolve).
+  syncfusion_flutter_pdf: 33.2.13+1
   speech_to_text: ^7.4.0
   tiktoken: ^1.0.3
   supabase_flutter: ^2.14.2

@@ -78,26 +78,26 @@ class _AppShellState extends State<AppShell> {
           child: Stack(
             children: [
               const Positioned.fill(child: ThemedBackdrop()),
+              // MUSE ENHANCEMENT: IndexedStack instead of AnimatedSwitcher.
+              // The previous switcher disposed the old view on every switch,
+              // so ChatScreen lost its scroll position and input draft when
+              // returning from Settings/Plugins/Token Usage. IndexedStack
+              // keeps all four views alive; the trade-off is higher memory
+              // use, which is acceptable here versus losing user input.
               Positioned.fill(
-                child: AnimatedSwitcher(
-                  duration: Duration(
-                    milliseconds:
-                        (MediaQuery.maybeOf(context)?.disableAnimations ??
-                            false)
-                        ? 1
-                        : 220,
-                  ),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  child: KeyedSubtree(
-                    key: ValueKey(app.currentView),
-                    child: switch (app.currentView) {
-                      AppView.chat => const ChatScreen(),
-                      AppView.settings => const SettingsScreen(),
-                      AppView.tokenUsage => const TokenUsageScreen(),
-                      AppView.plugins => const PluginScreen(),
-                    },
-                  ),
+                child: IndexedStack(
+                  index: switch (app.currentView) {
+                    AppView.chat => 0,
+                    AppView.settings => 1,
+                    AppView.tokenUsage => 2,
+                    AppView.plugins => 3,
+                  },
+                  children: const [
+                    ChatScreen(),
+                    SettingsScreen(),
+                    TokenUsageScreen(),
+                    PluginScreen(),
+                  ],
                 ),
               ),
               if (showHeader)
@@ -938,7 +938,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                   child: Row(
                     children: [
                       Text(
-                        'AdoetzGPT',
+                        'AdoetzGPT2',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
@@ -1046,59 +1046,86 @@ class _AppDrawerState extends State<_AppDrawer> {
                     () => app.setView(AppView.tokenUsage),
                   ),
                 ),
+                // MUSE ENHANCEMENT: CustomScrollView + SliverList.builder
+                // for sessions. The old ListView built every session tile
+                // up front (...visibleSessions.map); the builder only
+                // builds visible tiles, so a long history no longer slows
+                // opening the drawer.
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    children: [
-                      const _AgentServersSection(),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 22,
-                          vertical: 10,
-                        ),
-                        child: Divider(color: p.outline),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-                        child: Text(
-                          (searchQuery.isEmpty
-                                  ? copy.t('sidebar', 'recentSessions')
-                                  : 'Search results')
-                              .toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: p.onSurfaceVariant.withValues(alpha: 0.7),
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.4,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _AgentServersSection(),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 22,
+                                  vertical: 10,
+                                ),
+                                child: Divider(color: p.outline),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(14, 8, 14, 10),
+                                child: Text(
+                                  (searchQuery.isEmpty
+                                          ? copy.t('sidebar', 'recentSessions')
+                                          : 'Search results')
+                                      .toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: p.onSurfaceVariant
+                                        .withValues(alpha: 0.7),
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                       if (searchQuery.isNotEmpty && visibleSessions.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
-                          child: Text(
-                            'No chats contain "$searchQuery".',
-                            style: TextStyle(
-                              color: p.onSurfaceVariant,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(26, 18, 26, 18),
+                          sliver: SliverToBoxAdapter(
+                            child: Text(
+                              'No chats contain "$searchQuery".',
+                              style: TextStyle(
+                                color: p.onSurfaceVariant,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         )
                       else
-                        ...visibleSessions.map(
-                          (session) => _SessionTile(
-                            session: session,
-                            query: searchQuery,
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          sliver: SliverList.builder(
+                            itemCount: visibleSessions.length,
+                            itemBuilder: (context, index) => _SessionTile(
+                              session: visibleSessions[index],
+                              query: searchQuery,
+                            ),
                           ),
                         ),
                       if (searchQuery.isEmpty && genericSessions.isNotEmpty)
-                        _NavTile(
-                          icon: LucideIcons.trash2,
-                          label: copy.t('sidebar', 'clearAll'),
-                          active: false,
-                          danger: true,
-                          onTap: () => _confirmClear(context, app),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: _NavTile(
+                              icon: LucideIcons.trash2,
+                              label: copy.t('sidebar', 'clearAll'),
+                              active: false,
+                              danger: true,
+                              onTap: () => _confirmClear(context, app),
+                            ),
+                          ),
                         ),
                     ],
                   ),

@@ -1,11 +1,11 @@
 {
-    "name": "AdoetzGPT",
-    "short_name": "AdoetzGPT",
+    "name": "AdoetzGPT2",
+    "short_name": "AdoetzGPT2",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0f172a",
     "theme_color": "#0f172a",
-    "description": "AdoetzGPT rebuilt with Flutter.",
+    "description": "AdoetzGPT2 rebuilt with Flutter.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -44,6 +44,53 @@ class SlashCommand {
   final bool Function(BuildContext context, AdoetzAppState app) action;
 }
 
+// MUSE ENHANCEMENT: commands whose action is `=> false` in
+// _getAvailableCommands. They are hidden from the slash menu and, when
+// typed manually, show "not implemented yet" instead of silently being
+// sent as an ordinary chat message. Keep this list in sync when a
+// command is actually implemented (remove it here).
+const _unimplementedSlashCommands = <String>{
+  'rename',
+  'sessions',
+  'search',
+  'help',
+  'model',
+  'models',
+  'model text',
+  'model image',
+  'model video',
+  'model live',
+  'text',
+  'video',
+  'live',
+  'retry',
+  'regenerate',
+  'continue',
+  'system',
+  'aspect',
+  'aspect 1:1',
+  'aspect 16:9',
+  'aspect 9:16',
+  'gallery',
+  'upload',
+  'duration',
+  'duration 5',
+  'duration 8',
+  'extend',
+  'theme',
+  'theme light',
+  'theme dark',
+  'language',
+  'language en',
+  'language id',
+  'debug',
+  'status',
+  'storage',
+  'export',
+  'import',
+  'version',
+};
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -590,6 +637,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       final match = commands.firstWhere((c) => c.name.toLowerCase() == commandName, orElse: () => SlashCommand(name: '', description: '', category: '', action: (c, a) => false));
       
       if (match.name.isNotEmpty) {
+        // MUSE ENHANCEMENT: do not silently fall through and send a
+        // dead command as chat text. Tell the user it is not ready yet.
+        if (_unimplementedSlashCommands.contains(match.name.toLowerCase())) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('/${match.name} belum tersedia saat ini.'),
+            ),
+          );
+          setState(() => _showSlashCommands = false);
+          return;
+        }
         final handled = match.action(context, app);
         if (handled) {
           input.clear();
@@ -1502,6 +1560,31 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onEditSave;
   final ValueChanged<AttachmentData>? onEditImage;
 
+  // MUSE ENHANCEMENT: small bounded cache for parseText. Finished
+  // messages are re-built on every notifyListeners/scroll, and parsing
+  // re-ran the <think> regex over the full text each time. Cache by
+  // message id + exact text; streaming text changes every chunk, so it
+  // naturally misses and re-parses, which is correct. Cap at 200 to
+  // avoid unbounded growth on very long histories.
+  static final Map<String, String> _parseCacheText = {};
+  static final Map<String, ParsedText> _parseCacheResult = {};
+
+  static ParsedText _parsedFor(Message message) {
+    if (_parseCacheText[message.id] == message.text) {
+      final cached = _parseCacheResult[message.id];
+      if (cached != null) return cached;
+    }
+    final parsed = parseText(message.text);
+    _parseCacheText[message.id] = message.text;
+    _parseCacheResult[message.id] = parsed;
+    while (_parseCacheResult.length > 200) {
+      final oldest = _parseCacheResult.keys.first;
+      _parseCacheResult.remove(oldest);
+      _parseCacheText.remove(oldest);
+    }
+    return parsed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AdoetzAppState>();
@@ -1511,7 +1594,7 @@ class _MessageBubble extends StatelessWidget {
     if (message.isSystem) {
       return _TargetSwitchDivider(message: message, palette: p);
     }
-    final parsed = parseText(message.text);
+    final parsed = _parsedFor(message);
     final align = message.isUser
         ? CrossAxisAlignment.end
         : CrossAxisAlignment.start;
@@ -2134,6 +2217,10 @@ class _MarkdownMessageState extends State<_MarkdownMessage> {
                       if (bytes != null) {
                         return Image.memory(
                           bytes,
+                          // MUSE: cap decode size; chat lane max is 980,
+                          // so 2x (1960) is plenty and avoids decoding a
+                          // full-resolution photo for a chat bubble.
+                          cacheWidth: 1960,
                           errorBuilder: (context, error, stackTrace) =>
                               const Icon(
                                 Icons.broken_image,
@@ -2260,7 +2347,11 @@ class _SlashCommandMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = AppPalette.fromBrightness(Theme.of(context).brightness == Brightness.dark);
     final filtered = commands
-        .where((c) => c.name.toLowerCase().startsWith(query))
+        .where(
+          (c) =>
+              !_unimplementedSlashCommands.contains(c.name.toLowerCase()) &&
+              c.name.toLowerCase().startsWith(query),
+        )
         .take(6)
         .toList();
 
@@ -2910,6 +3001,9 @@ class _MessageAttachments extends StatelessWidget {
                       bytes,
                       width: 180,
                       height: 180,
+                      // MUSE: thumbnail is 180x180, decode at 2x only.
+                      cacheWidth: 360,
+                      cacheHeight: 360,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -3125,7 +3219,8 @@ class _AttachmentTray extends StatelessWidget {
                             : LucideIcons.fileText,
                         color: p.onSurfaceVariant,
                       )
-                    : Image.memory(bytes, fit: BoxFit.cover),
+                    // MUSE: small attachment tray thumbnail, not full-res.
+                    : Image.memory(bytes, fit: BoxFit.cover, cacheWidth: 240),
               ),
               Positioned(
                 top: -6,
