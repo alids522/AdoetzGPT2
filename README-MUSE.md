@@ -81,3 +81,10 @@ Do NOT push from here without checking the remote first: the copied
   Creation via the GitHub App connector failed with 403 (App token
   cannot create repositories); creation is being retried via the
   user browser session.
+
+## App ID change (2026-10-30)
+
+- Android applicationId changed from com.adoetz.adoetzgpt2 to com.adoetzgpt3.chat, because the original repo already used com.adoetz.adoetzgpt2, so the first AdoetzGPT2 APK still overwrote the old install.
+- iOS bundle id aligned to the same com.adoetzgpt3.chat (RunnerTests: com.adoetzgpt3.chat.RunnerTests).
+- Android namespace kept at com.adoetz.adoetzgpt2 (Kotlin/R package); only applicationId determines the Android install identity. OAuth schemes (adoetzgpt, com.adoetzgpt) unchanged.
+- Display name stays AdoetzGPT2.
